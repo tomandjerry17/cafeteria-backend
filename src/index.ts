@@ -4,6 +4,9 @@ import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
 import authRoutes from "./routes/auth"; // 👈 include .js if using ESM/ts-node
 import orderRoutes from "./routes/orders";
+import menuRoutes from "./routes/menu";
+
+
 
 
 dotenv.config();
@@ -18,6 +21,7 @@ app.use(express.json());
 // ✅ Then routes
 app.use("/auth", authRoutes);
 app.use("/orders", orderRoutes);
+app.use("/menu", menuRoutes);
 
 app.get("/", (_req, res) => res.send("Cafeteria backend running"));
 

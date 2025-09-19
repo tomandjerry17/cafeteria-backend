@@ -29,6 +29,7 @@ export function requireRole(roles: string[]) {
     if (!req.user) return res.status(401).json({ error: "Not authenticated" });
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({ error: "Forbidden: insufficient role" });
+      // return res.status(403).json({ error: `Forbidden: ${req.user.role.charAt(0).toUpperCase() + req.user.role.slice(1)} only` });
     }
     next();
   };

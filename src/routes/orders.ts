@@ -5,7 +5,9 @@ import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth"
 const router = Router();
 const prisma = new PrismaClient();
 
-// Create order (only STUDENTS can place orders)
+/**
+ * STUDENT: Create order
+ */
 router.post(
   "/", 
   authenticateToken, 
@@ -13,7 +15,7 @@ router.post(
   async (req: AuthRequest, res) => {
     try {
       const { items, pickupTime, pickupType } = req.body;
-      const userId = req.user!.userId; // 🔹 get from JWT instead of body
+      const userId = req.user!.userId; // from JWT
 
       if (!items || items.length === 0) {
         return res.status(400).json({ error: "No items provided" });
@@ -25,7 +27,6 @@ router.post(
         where: { id: { in: itemIds } }
       });
 
-      // Pre-check stock and availability
       for (const it of items) {
         const mi = menuItems.find(m => m.id === it.menuId);
         if (!mi) return res.status(400).json({ error: `Item ${it.menuId} not found` });
@@ -37,16 +38,14 @@ router.post(
 
       // Run transaction
       const order = await prisma.$transaction(async (tx) => {
-        // Calculate total price from DB to avoid tampering
         const totalPrice = items.reduce((sum: number, it: any) => {
           const mi = menuItems.find(m => m.id === it.menuId)!;
           return sum + Number(mi.price) * it.quantity;
         }, 0);
 
-        // Create order + order items
         const newOrder = await tx.order.create({
           data: {
-            userId, // 🔹 taken from JWT, not request body
+            userId,
             pickupType,
             pickupTime: pickupTime ? new Date(pickupTime) : null,
             totalPrice,
@@ -61,7 +60,6 @@ router.post(
           include: { orderItems: true }
         });
 
-        // Decrement stock + log inventory
         for (const it of items) {
           const mi = menuItems.find(m => m.id === it.menuId)!;
           if (mi.stockLimit !== null) {
@@ -72,7 +70,7 @@ router.post(
           }
           await tx.inventoryLog.create({
             data: {
-              staffId: null, // system action
+              staffId: null,
               itemId: it.menuId,
               changeType: "deduct",
               quantity: it.quantity,
@@ -85,7 +83,6 @@ router.post(
       });
 
       res.json(order);
-
     } catch (err: any) {
       console.error(err);
       res.status(500).json({ error: err.message || "Failed to create order" });
@@ -93,7 +90,9 @@ router.post(
   }
 );
 
-// Update order status (STAFF or ADMIN only)
+/**
+ * STAFF/ADMIN: Update order status
+ */
 router.put(
   "/:id/status",
   authenticateToken,
@@ -103,9 +102,7 @@ router.put(
       const { status } = req.body;
       const orderId = req.params.id;
 
-      if (!orderId) {
-        return res.status(400).json({ error: "Order ID is required" });
-      }
+      if (!orderId) return res.status(400).json({ error: "Order ID is required" });
 
       const allowedStatuses = ["pending", "confirmed", "preparing", "ready", "rejected", "picked_up"];
       if (!allowedStatuses.includes(status)) {
@@ -113,7 +110,7 @@ router.put(
       }
 
       const updated = await prisma.order.update({
-        where: { id: orderId }, // ✅ TypeScript now knows this is a string
+        where: { id: orderId },
         data: { status },
         include: { orderItems: true }
       });
@@ -126,5 +123,82 @@ router.put(
   }
 );
 
+/**
+ * ANY AUTHENTICATED: Get order by ID (student must own it)
+ */
+router.get(
+  "/:id",
+  authenticateToken,
+  async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+
+      if (!id) {
+        return res.status(400).json({ error: "Order ID is required" });
+      }
+
+      const order = await prisma.order.findUnique({
+        where: { id: String(id) }, // ✅ ensure it's a string
+        include: { orderItems: { include: { item: true } } }
+      });
+
+      if (!order) return res.status(404).json({ error: "Order not found" });
+
+      if (req.user!.role === "student" && order.userId !== req.user!.userId) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      res.json(order);
+    } catch (err: any) {
+      console.error(err);
+      res.status(500).json({ error: "Failed to fetch order" });
+    }
+  }
+);
+
+/**
+ * STUDENT: Get own orders
+ */
+router.get(
+  "/user/me",
+  authenticateToken,
+  requireRole(["student"]),
+  async (req: AuthRequest, res) => {
+    try {
+      const orders = await prisma.order.findMany({
+        where: { userId: req.user!.userId },
+        include: { orderItems: { include: { item: true } } },
+        orderBy: { createdAt: "desc" }
+      });
+
+      res.json(orders);
+    } catch (err: any) {
+      console.error(err);
+      res.status(500).json({ error: "Failed to fetch orders" });
+    }
+  }
+);
+
+/**
+ * STAFF/ADMIN: Get all orders
+ */
+router.get(
+  "/staff/all",
+  authenticateToken,
+  requireRole(["staff", "admin"]),
+  async (_req, res) => {
+    try {
+      const orders = await prisma.order.findMany({
+        include: { orderItems: { include: { item: true } }, user: true },
+        orderBy: { createdAt: "desc" }
+      });
+
+      res.json(orders);
+    } catch (err: any) {
+      console.error(err);
+      res.status(500).json({ error: "Failed to fetch incoming orders" });
+    }
+  }
+);
 
 export default router;
