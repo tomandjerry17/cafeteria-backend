@@ -15,20 +15,25 @@ datasource db {
 }
 
 model User {
-  id          String       @id @default(uuid())
-  role        Role
-  fullName    String
-  email       String       @unique
-  passwordHash String
-  contact     String?
-  studentId   String?
-  createdAt   DateTime     @default(now())
+  id                   String       @id @default(uuid())
+  role                 Role
+  fullName             String
+  email                String       @unique
+  passwordHash         String
+  contact              String?
+  studentId            String?
+  emailVerified        Boolean      @default(false)
+  approved             Boolean      @default(false)   // 👈 NEW field for staff approval
+  verificationCode     String?      // store 4-digit code temporarily
+  resetPasswordToken   String?      // new
+  resetPasswordExpires DateTime?    // new
+  createdAt            DateTime     @default(now())
 
-  orders      Order[]
-  favorites   Favorite[]
-  feedback    Feedback[]
-  notifications Notification[]
-  inventoryLogs InventoryLog[]
+  orders           Order[]
+  favorites        Favorite[]
+  feedback         Feedback[]
+  notifications    Notification[]
+  inventoryLogs    InventoryLog[]
 }
 
 enum Role {

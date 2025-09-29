@@ -15,7 +15,13 @@ const app = express();
 const prisma = new PrismaClient();
 
 // ✅ Middleware first
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || "http://localhost:5173", // your frontend dev server URL
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+}));
+
 app.use(express.json());
 
 // ✅ Then routes
