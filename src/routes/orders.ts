@@ -159,48 +159,36 @@ router.get("/:id", authenticateToken, async (req: AuthRequest, res) => {
 });
 
 /**
- * 👤 STUDENT: Get own orders
+ * 🌐 UNIVERSAL: Get orders (role-based)
+ * - Student: own orders
+ * - Staff/Admin: all orders
  */
 router.get(
-  "/user/me",
+  "/",
   authenticateToken,
-  requireRole(["student"]),
   async (req: AuthRequest, res) => {
     try {
-      const orders = await prisma.order.findMany({
-        where: { userId: req.user!.userId },
-        include: { orderItems: { include: { item: true } } },
-        orderBy: { createdAt: "desc" },
-      });
+      const user = req.user!;
+      let orders;
+
+      if (user.role === "student") {
+        orders = await prisma.order.findMany({
+          where: { userId: user.userId },
+          include: { orderItems: { include: { item: true } } },
+          orderBy: { createdAt: "desc" },
+        });
+      } else if (user.role === "staff" || user.role === "admin") {
+        orders = await prisma.order.findMany({
+          include: { orderItems: { include: { item: true } }, user: true },
+          orderBy: { createdAt: "desc" },
+        });
+      } else {
+        return res.status(403).json({ error: "Forbidden" });
+      }
 
       res.json(orders);
     } catch (err: any) {
-      console.error("Get Student Orders Error:", err);
-      res.status(500).json({ error: "Failed to fetch orders" });
-    }
-  }
-);
-
-/**
- * 👩‍🍳 STAFF/ADMIN: Get all orders
- */
-router.get(
-  "/staff/all",
-  authenticateToken,
-  requireRole(["staff", "admin"]),
-  async (_req, res) => {
-    try {
-      const orders = await prisma.order.findMany({
-        include: {
-          orderItems: { include: { item: true } },
-          user: true,
-        },
-        orderBy: { createdAt: "desc" },
-      });
-
-      res.json(orders);
-    } catch (err: any) {
-      console.error("Get All Orders Error:", err);
+      console.error("Get Orders Error:", err);
       res.status(500).json({ error: "Failed to fetch orders" });
     }
   }
