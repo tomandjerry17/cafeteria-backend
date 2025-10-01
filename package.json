@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon --watch src --exec ts-node src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "postinstall": "prisma generate",
+    "start": "npx prisma migrate deploy && node dist/index.js",
     "prepare": "husky install"
   },
   "keywords": [],
