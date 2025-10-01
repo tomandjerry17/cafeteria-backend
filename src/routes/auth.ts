@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../db";
 import { sendEmail } from "../utils/mailer";
 import { forgotPassword, resetPassword } from "../controllers/auth";
 import { getCurrentUser } from "../controllers/auth";
@@ -10,7 +10,6 @@ import { registerStaff } from "../controllers/auth";
 
 
 const router = Router();
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || "dev_secret"; // use env var in prod
 
 // Generate 4-digit code

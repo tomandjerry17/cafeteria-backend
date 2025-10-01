@@ -2,11 +2,10 @@ import type { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../db";
 import { sendEmail } from "../utils/mailer";
 import { AuthRequest } from "../middleware/auth";
 
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 
 // Generate 4-digit verification code
