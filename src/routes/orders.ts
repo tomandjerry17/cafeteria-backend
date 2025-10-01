@@ -1,34 +1,39 @@
 import { Router } from "express";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, OrderStatus, PickupType, Prisma } from "@prisma/client";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
 
 const router = Router();
 const prisma = new PrismaClient();
 
 /**
- * STUDENT: Create order
+ * 🎯 STUDENT: Create new order
  */
 router.post(
-  "/", 
-  authenticateToken, 
-  requireRole(["student"]), 
+  "/",
+  authenticateToken,
+  requireRole(["student"]),
   async (req: AuthRequest, res) => {
     try {
       const { items, pickupTime, pickupType } = req.body;
-      const userId = req.user!.userId; // from JWT
+      const userId = req.user!.userId;
 
       if (!items || items.length === 0) {
         return res.status(400).json({ error: "No items provided" });
       }
 
-      // Validate menu items
+      // ✅ Validate pickup type
+      if (!Object.values(PickupType).includes(pickupType)) {
+        return res.status(400).json({ error: "Invalid pickup type" });
+      }
+
+      // ✅ Validate menu items
       const itemIds = items.map((i: any) => i.menuId);
       const menuItems = await prisma.menuItem.findMany({
-        where: { id: { in: itemIds } }
+        where: { id: { in: itemIds } },
       });
 
       for (const it of items) {
-        const mi = menuItems.find(m => m.id === it.menuId);
+        const mi = menuItems.find((m) => m.id === it.menuId);
         if (!mi) return res.status(400).json({ error: `Item ${it.menuId} not found` });
         if (!mi.availability) return res.status(400).json({ error: `${mi.name} is not available` });
         if (mi.stockLimit !== null && mi.stockLimit < it.quantity) {
@@ -36,36 +41,37 @@ router.post(
         }
       }
 
-      // Run transaction
+      // ✅ Create order in transaction
       const order = await prisma.$transaction(async (tx) => {
         const totalPrice = items.reduce((sum: number, it: any) => {
-          const mi = menuItems.find(m => m.id === it.menuId)!;
+          const mi = menuItems.find((m) => m.id === it.menuId)!;
           return sum + Number(mi.price) * it.quantity;
         }, 0);
 
         const newOrder = await tx.order.create({
           data: {
             userId,
-            pickupType,
+            pickupType: pickupType as PickupType,
             pickupTime: pickupTime ? new Date(pickupTime) : null,
-            totalPrice,
+            totalPrice: new Prisma.Decimal(totalPrice),
             orderItems: {
               create: items.map((it: any) => ({
                 itemId: it.menuId,
                 quantity: it.quantity,
-                priceAtOrder: menuItems.find(m => m.id === it.menuId)!.price,
-              }))
-            }
+                priceAtOrder: menuItems.find((m) => m.id === it.menuId)!.price,
+              })),
+            },
           },
-          include: { orderItems: true }
+          include: { orderItems: true },
         });
 
+        // ✅ Decrement stock and log inventory changes
         for (const it of items) {
-          const mi = menuItems.find(m => m.id === it.menuId)!;
+          const mi = menuItems.find((m) => m.id === it.menuId)!;
           if (mi.stockLimit !== null) {
             await tx.menuItem.update({
               where: { id: it.menuId },
-              data: { stockLimit: { decrement: it.quantity } }
+              data: { stockLimit: { decrement: it.quantity } },
             });
           }
           await tx.inventoryLog.create({
@@ -74,8 +80,8 @@ router.post(
               itemId: it.menuId,
               changeType: "deduct",
               quantity: it.quantity,
-              note: `Order #${newOrder.id}`
-            }
+              note: `Order #${newOrder.id}`,
+            },
           });
         }
 
@@ -84,14 +90,14 @@ router.post(
 
       res.json(order);
     } catch (err: any) {
-      console.error(err);
+      console.error("Create Order Error:", err);
       res.status(500).json({ error: err.message || "Failed to create order" });
     }
   }
 );
 
 /**
- * STAFF/ADMIN: Update order status
+ * 🛠 STAFF/ADMIN: Update order status
  */
 router.put(
   "/:id/status",
@@ -99,65 +105,61 @@ router.put(
   requireRole(["staff", "admin"]),
   async (req: AuthRequest, res) => {
     try {
+      const { id } = req.params;
       const { status } = req.body;
-      const orderId = req.params.id;
 
-      if (!orderId) return res.status(400).json({ error: "Order ID is required" });
+      if (!id) return res.status(400).json({ error: "Order ID is required" });
+      if (!status) return res.status(400).json({ error: "Status is required" });
 
-      const allowedStatuses = ["pending", "confirmed", "preparing", "ready", "rejected", "picked_up"];
+      const allowedStatuses = Object.values(OrderStatus);
       if (!allowedStatuses.includes(status)) {
         return res.status(400).json({ error: "Invalid status" });
       }
 
       const updated = await prisma.order.update({
-        where: { id: orderId },
-        data: { status },
-        include: { orderItems: true }
+        where: { id },
+        data: { status: status as OrderStatus },
+        include: { orderItems: { include: { item: true } }, user: true },
       });
 
       res.json(updated);
     } catch (err: any) {
-      console.error(err);
-      res.status(500).json({ error: "Failed to update status" });
+      console.error("Update Status Error:", err);
+      res.status(500).json({ error: "Failed to update order status" });
     }
   }
 );
 
 /**
- * ANY AUTHENTICATED: Get order by ID (student must own it)
+ * 🔎 ANY AUTHENTICATED: Get specific order
+ * (Students can only view their own)
  */
-router.get(
-  "/:id",
-  authenticateToken,
-  async (req: AuthRequest, res) => {
-    try {
-      const { id } = req.params;
+router.get("/:id", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
 
-      if (!id) {
-        return res.status(400).json({ error: "Order ID is required" });
-      }
+    if (!id) return res.status(400).json({ error: "Order ID is required" });
+    
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: { orderItems: { include: { item: true } }, user: true },
+    });
 
-      const order = await prisma.order.findUnique({
-        where: { id: String(id) }, // ✅ ensure it's a string
-        include: { orderItems: { include: { item: true } } }
-      });
+    if (!order) return res.status(404).json({ error: "Order not found" });
 
-      if (!order) return res.status(404).json({ error: "Order not found" });
-
-      if (req.user!.role === "student" && order.userId !== req.user!.userId) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
-
-      res.json(order);
-    } catch (err: any) {
-      console.error(err);
-      res.status(500).json({ error: "Failed to fetch order" });
+    if (req.user!.role === "student" && order.userId !== req.user!.userId) {
+      return res.status(403).json({ error: "Forbidden" });
     }
+
+    res.json(order);
+  } catch (err: any) {
+    console.error("Get Order Error:", err);
+    res.status(500).json({ error: "Failed to fetch order" });
   }
-);
+});
 
 /**
- * STUDENT: Get own orders
+ * 👤 STUDENT: Get own orders
  */
 router.get(
   "/user/me",
@@ -168,19 +170,19 @@ router.get(
       const orders = await prisma.order.findMany({
         where: { userId: req.user!.userId },
         include: { orderItems: { include: { item: true } } },
-        orderBy: { createdAt: "desc" }
+        orderBy: { createdAt: "desc" },
       });
 
       res.json(orders);
     } catch (err: any) {
-      console.error(err);
+      console.error("Get Student Orders Error:", err);
       res.status(500).json({ error: "Failed to fetch orders" });
     }
   }
 );
 
 /**
- * STAFF/ADMIN: Get all orders
+ * 👩‍🍳 STAFF/ADMIN: Get all orders
  */
 router.get(
   "/staff/all",
@@ -189,14 +191,40 @@ router.get(
   async (_req, res) => {
     try {
       const orders = await prisma.order.findMany({
-        include: { orderItems: { include: { item: true } }, user: true },
-        orderBy: { createdAt: "desc" }
+        include: {
+          orderItems: { include: { item: true } },
+          user: true,
+        },
+        orderBy: { createdAt: "desc" },
       });
 
       res.json(orders);
     } catch (err: any) {
-      console.error(err);
-      res.status(500).json({ error: "Failed to fetch incoming orders" });
+      console.error("Get All Orders Error:", err);
+      res.status(500).json({ error: "Failed to fetch orders" });
+    }
+  }
+);
+
+/**
+ * ❌ STAFF/ADMIN: Delete order
+ */
+router.delete(
+  "/:id",
+  authenticateToken,
+  requireRole(["staff", "admin"]),
+  async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      if (!id) return res.status(400).json({ error: "Order ID is required" });
+
+      await prisma.orderItem.deleteMany({ where: { orderId: id } });
+      await prisma.order.delete({ where: { id } });
+
+      res.json({ success: true, message: "Order deleted successfully" });
+    } catch (err: any) {
+      console.error("Delete Order Error:", err);
+      res.status(500).json({ error: "Failed to delete order" });
     }
   }
 );
