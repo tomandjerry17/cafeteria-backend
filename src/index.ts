@@ -16,7 +16,8 @@ const app = express();
 // ✅ Middleware first
 app.use(cors({
   origin: [
-    "https://cafeteria-auth.vercel.app", // ✅ your live frontend
+    "https://cafeteria-auth.vercel.app", // Staff Portal
+    "https://sotf-enggg.vercel.app/", // Student Portal
     "http://localhost:5173",             // ✅ local dev
   ],
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
