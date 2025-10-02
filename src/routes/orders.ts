@@ -1,9 +1,9 @@
 import { Router } from "express";
-import { PrismaClient, OrderStatus, PickupType, Prisma } from "@prisma/client";
+import { OrderStatus, PickupType, Prisma } from "@prisma/client";
+import { prisma } from "../db";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
 
 const router = Router();
-const prisma = new PrismaClient();
 
 /**
  * 🎯 STUDENT: Create new order
