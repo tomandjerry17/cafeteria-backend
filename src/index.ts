@@ -17,7 +17,7 @@ const app = express();
 app.use(cors({
   origin: [
     "https://cafeteria-auth.vercel.app", // Staff Portal
-    "https://sotf-enggg.vercel.app", // Student Portal
+    "https://e-faspecc.vercel.app", // Student Portal
     "http://localhost:5173",
     "http://localhost:5174",             // ✅ local dev
   ],
