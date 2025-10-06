@@ -76,6 +76,27 @@ router.post(
   }
 );
 
+// Get staff statistics
+router.get(
+  "/staff-stats",
+  authenticateToken,
+  requireRole(["admin"]),
+  async (req, res) => {
+    try {
+      const [total, approved, pending] = await Promise.all([
+        prisma.user.count({ where: { role: "staff" } }),
+        prisma.user.count({ where: { role: "staff", approved: true } }),
+        prisma.user.count({ where: { role: "staff", approved: false } }),
+      ]);
+
+      res.json({ total, approved, pending });
+    } catch (err) {
+      console.error("Error fetching staff stats:", err);
+      res.status(500).json({ error: "Server error" });
+    }
+  }
+);
+
 // ===============================
 // REGISTER
 // ===============================
