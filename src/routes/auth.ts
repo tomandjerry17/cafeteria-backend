@@ -7,6 +7,7 @@ import { forgotPassword, resetPassword } from "../controllers/auth";
 import { getCurrentUser } from "../controllers/auth";
 import { authenticateToken, requireRole } from "../middleware/auth";
 import { registerStaff } from "../controllers/auth";
+import type { AuthRequest } from "../middleware/auth";
 
 
 const router = Router();
@@ -310,5 +311,37 @@ router.get("/user", async (req, res) => {
 // forgot + reset
 router.post("/forgot", forgotPassword);
 router.post("/reset/:token", resetPassword);
+
+router.put("/update", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    // Extract authenticated user's ID
+    const { userId } = req.user!;
+
+    const { fullName, contact, studentId } = req.body;
+
+    // Update user in the database
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        fullName,
+        contact,
+        studentId,
+      },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        role: true,
+        contact: true,
+        studentId: true,
+      },
+    });
+
+    res.json(updatedUser);
+  } catch (err) {
+    console.error("Error updating user:", err);
+    res.status(500).json({ error: "Failed to update user" });
+  }
+});
 
 export default router;
