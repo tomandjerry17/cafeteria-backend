@@ -5,6 +5,7 @@ import { prisma } from "./db";
 import authRoutes from "./routes/auth"; // 👈 include .js if using ESM/ts-node
 import orderRoutes from "./routes/orders";
 import menuRoutes from "./routes/menu";
+import paymentRoutes from "./routes/payments";
 
 
 
@@ -32,6 +33,7 @@ app.use(express.json());
 app.use("/auth", authRoutes);
 app.use("/orders", orderRoutes);
 app.use("/menu", menuRoutes);
+app.use("/payments", paymentRoutes);
 
 app.get("/", (_req, res) => res.send("Cafeteria backend running"));
 

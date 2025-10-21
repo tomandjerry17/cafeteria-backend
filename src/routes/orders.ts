@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Response } from "express";
 import { OrderStatus, PickupType, Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
@@ -15,7 +15,7 @@ router.post(
   async (req: AuthRequest, res) => {
     try {
       const { items, pickupTime, pickupType } = req.body;
-      const userId = req.user!.userId;
+      const userId = req.user!.id;
 
       if (!items || items.length === 0) {
         return res.status(400).json({ error: "No items provided" });
@@ -216,5 +216,45 @@ router.delete(
     }
   }
 );
+
+/**
+ * 💳 STUDENT: Confirm payment readiness
+ */
+router.patch(
+  "/:id/confirm-payment",
+  authenticateToken,
+  requireRole(["student"]),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const user = req.user!;
+
+      if (!id) return res.status(400).json({ error: "Order ID is required" });
+
+      // ✅ Ensure the order belongs to the student
+      const order = await prisma.order.findUnique({ where: { id } });
+      if (!order) return res.status(404).json({ error: "Order not found" });
+      if (order.userId !== user.id) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      // ✅ Only allow confirmation when order is 'ready'
+      if (order.status !== "ready") {
+        return res.status(400).json({ error: "You can only confirm payment when your order is ready." });
+      }
+
+      const updated = await prisma.order.update({
+        where: { id },
+        data: { paymentConfirmed: true },
+      });
+
+      res.json({ success: true, message: "Payment confirmed successfully", order: updated });
+    } catch (err: any) {
+      console.error("Confirm Payment Error:", err);
+      res.status(500).json({ error: "Failed to confirm payment" });
+    }
+  }
+);
+
 
 export default router;
