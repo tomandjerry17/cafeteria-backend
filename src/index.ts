@@ -7,9 +7,6 @@ import orderRoutes from "./routes/orders";
 import menuRoutes from "./routes/menu";
 import paymentRoutes from "./routes/payments";
 
-
-
-
 dotenv.config();
 
 const app = express();

@@ -147,7 +147,7 @@ router.get("/:id", authenticateToken, async (req: AuthRequest, res) => {
 
     if (!order) return res.status(404).json({ error: "Order not found" });
 
-    if (req.user!.role === "student" && order.userId !== req.user!.userId) {
+    if (req.user!.role === "student" && order.userId !== req.user!.id) {
       return res.status(403).json({ error: "Forbidden" });
     }
 
@@ -173,7 +173,7 @@ router.get(
 
       if (user.role === "student") {
         orders = await prisma.order.findMany({
-          where: { userId: user.userId },
+          where: { userId: user.id },
           include: { orderItems: { include: { item: true } } },
           orderBy: { createdAt: "desc" },
         });
@@ -256,5 +256,60 @@ router.patch(
   }
 );
 
+/**
+ * 🧍 STUDENT: Cancel own order (if still pending)
+ */
+router.patch(
+  "/:id/cancel",
+  authenticateToken,
+  requireRole(["student"]),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const user = req.user!;
+
+      // ✅ Validate ID
+      if (!id) {
+        return res.status(400).json({ error: "Order ID is required" });
+      }
+
+      // ✅ Find order
+      const order = await prisma.order.findUnique({
+        where: { id: id as string },
+      });
+
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      // ✅ Ensure the order belongs to the logged-in student
+      if (order.userId !== user.id) {
+        return res.status(403).json({ error: "You can only cancel your own orders" });
+      }
+
+      // ✅ Only allow cancellation if still pending
+      if (order.status !== "pending") {
+        return res
+          .status(400)
+          .json({ error: "Only pending orders can be cancelled" });
+      }
+
+      // ✅ Update order to rejected
+      const updated = await prisma.order.update({
+        where: { id: id as string },
+        data: { status: "rejected" },
+      });
+
+      return res.json({
+        success: true,
+        message: "Order cancelled successfully",
+        order: updated,
+      });
+    } catch (err: any) {
+      console.error("Cancel Order Error:", err);
+      return res.status(500).json({ error: "Failed to cancel order" });
+    }
+  }
+);
 
 export default router;
