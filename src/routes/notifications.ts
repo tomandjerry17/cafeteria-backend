@@ -12,6 +12,7 @@ router.get("/", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const notifications = await prisma.notification.findMany({
       where: { userId: req.user!.id },
+      include: { order: true },
       orderBy: { createdAt: "desc" },
     });
 
