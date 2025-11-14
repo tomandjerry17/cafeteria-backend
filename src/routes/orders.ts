@@ -88,6 +88,17 @@ router.post(
         return newOrder;
       });
 
+      // After transaction
+      await prisma.notification.create({
+        data: {
+          userId, // the student who made the order
+          orderId: order.id,
+          message: `Your order #${order.id} has been placed successfully.`,
+          status: "unread",
+        },
+      });
+
+
       res.json(order);
     } catch (err: any) {
       console.error("Create Order Error:", err);
@@ -120,6 +131,16 @@ router.put(
         where: { id },
         data: { status: status as OrderStatus },
         include: { orderItems: { include: { item: true } }, user: true },
+      });
+
+      // ⭐ Notify the student about status update
+      await prisma.notification.create({
+        data: {
+          userId: updated.userId!,
+          orderId: updated.id,
+          message: `Your order #${updated.id} status is now: ${updated.status}.`,
+          status: "unread",
+        },
       });
 
       res.json(updated);

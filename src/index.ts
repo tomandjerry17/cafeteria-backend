@@ -7,6 +7,7 @@ import orderRoutes from "./routes/orders";
 import menuRoutes from "./routes/menu";
 import paymentRoutes from "./routes/payments";
 import feedbackRoutes from "./routes/feedback";
+import notificationsRoutes from "./routes/notifications";
 
 dotenv.config();
 
@@ -33,6 +34,7 @@ app.use("/orders", orderRoutes);
 app.use("/menu", menuRoutes);
 app.use("/payments", paymentRoutes);
 app.use("/feedback", feedbackRoutes);
+app.use("/notifications", notificationsRoutes);
 
 app.get("/", (_req, res) => res.send("Cafeteria backend running"));
 
