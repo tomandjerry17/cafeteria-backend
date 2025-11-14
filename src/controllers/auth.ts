@@ -234,6 +234,53 @@ export async function resetPassword(req: Request, res: Response) {
   }
 }
 
+// Change Password (Logged-in user)
+export async function changePassword(req: AuthRequest, res: Response) {
+  try {
+    // Ensure a user is authenticated
+    if (!req.user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const userId = req.user.id; // ✅ correct based on your middleware
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: "Missing password fields" });
+    }
+
+    // Get the user
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Compare old password
+    const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+
+    if (!isMatch) {
+      return res.status(400).json({ error: "Current password is incorrect" });
+    }
+
+    // Hash new password
+    const newHash = await bcrypt.hash(newPassword, 10);
+
+    // Save new password
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: newHash }
+    });
+
+    return res.json({ message: "Password updated successfully" });
+
+  } catch (err) {
+    console.error("Change password error:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+}
 
 export const getCurrentUser = async (req: AuthRequest, res: Response) => {
   try {

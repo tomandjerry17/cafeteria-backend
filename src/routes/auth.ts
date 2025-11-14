@@ -3,7 +3,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { prisma } from "../db";
 import { sendEmail } from "../utils/mailer";
-import { forgotPassword, resetPassword } from "../controllers/auth";
+import { forgotPassword, resetPassword, changePassword } from "../controllers/auth";
 import { getCurrentUser } from "../controllers/auth";
 import { authenticateToken, requireRole } from "../middleware/auth";
 import { registerStaff } from "../controllers/auth";
@@ -311,6 +311,8 @@ router.get("/user", async (req, res) => {
 // forgot + reset
 router.post("/forgot", forgotPassword);
 router.post("/reset/:token", resetPassword);
+router.patch("/change-password", authenticateToken, changePassword);
+
 
 router.put("/update", authenticateToken, async (req: AuthRequest, res) => {
   try {

@@ -6,6 +6,7 @@ import authRoutes from "./routes/auth"; // 👈 include .js if using ESM/ts-node
 import orderRoutes from "./routes/orders";
 import menuRoutes from "./routes/menu";
 import paymentRoutes from "./routes/payments";
+import feedbackRoutes from "./routes/feedback";
 
 dotenv.config();
 
@@ -31,6 +32,7 @@ app.use("/auth", authRoutes);
 app.use("/orders", orderRoutes);
 app.use("/menu", menuRoutes);
 app.use("/payments", paymentRoutes);
+app.use("/feedback", feedbackRoutes);
 
 app.get("/", (_req, res) => res.send("Cafeteria backend running"));
 
