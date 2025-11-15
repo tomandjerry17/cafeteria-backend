@@ -62,4 +62,36 @@ router.get("/", authenticateToken, async (req: Request, res: Response) => {
   }
 });
 
+// ⭐ GET ALL feedback (Staff Only)
+router.get("/all", authenticateToken, async (req: Request, res: Response) => {
+  if (!req.user) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  // Only staff/admin can access this
+  if (req.user.role !== "staff" && req.user.role !== "admin") {
+    return res.status(403).json({ error: "Forbidden: Staff only" });
+  }
+
+  try {
+    const feedback = await prisma.feedback.findMany({
+      include: {
+        user: {
+          select: {
+            fullName: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.json(feedback);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Failed to fetch all feedback" });
+  }
+});
+
+
 export default router;
