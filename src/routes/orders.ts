@@ -89,11 +89,12 @@ router.post(
       });
 
       // After transaction
+      const shortId = order.id.slice(0, 5);
       await prisma.notification.create({
         data: {
           userId, // the student who made the order
           orderId: order.id,
-          message: `Your order #${order.id} has been placed successfully.`,
+          message: `Your order #${shortId} has been placed successfully.`,
           status: "unread",
         },
       });
@@ -134,11 +135,12 @@ router.put(
       });
 
       // ⭐ Notify the student about status update
+      const shortId2 = updated.id.slice(0, 5);
       await prisma.notification.create({
         data: {
           userId: updated.userId!,
           orderId: updated.id,
-          message: `Your order #${updated.id} status is now: ${updated.status}.`,
+          message: `Your order #${shortId2} status is now: ${updated.status}.`,
           status: "unread",
         },
       });
